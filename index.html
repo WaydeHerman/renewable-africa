@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>D3: Setting path fills</title>
+		<script type="text/javascript" src="https://d3js.org/d3.v4.min.js"></script>
+		<style type="text/css">	
+            body {background-color: #F3F4EF;}
+
+            .mouse-over-country {
+                pointer-events: none;
+            }
+
+            .country-mouse-over-text {
+                font-family: Futura;
+                font-size: 12px;
+                fill: #134611;
+                pointer-events: none;
+            }
+
+            #country-mouse-over-box {
+                pointer-events: none;
+            }
+
+            .bar-label {
+                font-family: Futura;
+                font-size: 10px;
+                fill: #134611;
+                font-weight: bold;
+            }
+
+            .chart-title {
+                font-family: Adobe Garamond Pro;
+                font-size: 30px;
+                fill: #134611;
+                font-weight: bold;
+                stroke: #134611;
+                stroke-width: 0.5px;
+            }
+
+            .country {
+                cursor: pointer;
+            }
+
+            .bar {
+                cursor: pointer;
+            }
+            
+            .label {
+                text-anchor: End;
+            }
+
+            #DataViz {
+                text-align: center;
+            }
+		</style>
+	</head>
+	<body>
+
+        <div id="DataViz"></div>
+
+		<script type="text/javascript">
+
+			//Width and height
+			var w = 1200,
+			    h = 600,
+                barX = 280;
+        
+
+            var formatNumber = d3.format("s");
+            var formatComma = d3.format(".0%")
+
+			//Define map projection
+			var projection = d3.geoMercator()
+								   .translate([w/2+100, h/2])
+								   .scale([400]);
+
+			//Define path generator
+			var path = d3.geoPath()
+							 .projection(projection);
+
+
+			//Create SVG element
+			var svg = d3.select("#DataViz")
+						.append("svg")
+						.attr("width", w)
+						.attr("height", h);
+            
+            var chartTitle = svg.append("text")
+                .attr("class", "chart-title")
+                .attr("x", 100)
+                .attr("y", 200)
+                .text('Renewable Energy in Africa')
+
+            var color = d3.scaleQuantize()
+								.range(["rgb(237,248,233)","rgb(186,228,179)","rgb(116,196,118)","rgb(49,163,84)","rgb(0,109,44)"]);
+
+
+            var barScale = d3.scaleLinear()
+                    .domain([0,1])
+                    .range([3,110])
+
+            var colorPerc = d3.scaleLinear()
+                    .domain([0,100])
+                    .interpolate(d3.interpolateHcl)
+                    .range(['#C8C9C5','#9EB25D'])
+
+            var colorSolar = d3.scaleLinear()
+                    .domain([0,1])
+                    .interpolate(d3.interpolateHcl)
+                    .range(['#C8C9C5','#F1DB4B'])
+
+            var colorBio = d3.scaleLinear()
+                    .domain([0,1])
+                    .interpolate(d3.interpolateHcl)
+                    .range(['#C8C9C5','#678D58'])
+
+            var colorThermal = d3.scaleLinear()
+                    .domain([0,1])
+                    .interpolate(d3.interpolateHcl)
+                    .range(['#C8C9C5','#AD343E'])
+
+            var colorHydro = d3.scaleLinear()
+                    .domain([0,1])
+                    .interpolate(d3.interpolateHcl)
+                    .range(['#C8C9C5','#3A606E'])
+
+            var colorWind = d3.scaleLinear()
+                    .domain([0,1])
+                    .interpolate(d3.interpolateHcl)
+                    .range(['#C8C9C5','#A7C6DA'])
+                
+
+			//Load in GeoJSON data
+			d3.json("custom.geo.json", function(json) {
+
+                d3.csv("renewable_energy_africa_data.csv", function(data) {
+
+					//Loop through once for each ag. data value
+					for (var i = 0; i < data.length; i++) {
+						var dataName = data[i].name;
+                        var totalGenerated = +data[i].totalGenerated;
+                        var totalRenewableGenerated = +data[i].totalRenewableGenerated;
+                        var percOfTotal = +data[i].percOfTotal;
+                        var solarpower = +data[i].solarpower;
+                        var biomassAndWaste = +data[i].biomassAndWaste;
+                        var geothermal = +data[i].geothermal;
+                        var hydropower = +data[i].hydropower;
+                        var windpower = +data[i].windpower;
+				
+						//Find the corresponding state inside the GeoJSON
+						for (var j = 0; j < json.features.length; j++) {
+		
+							var jsonName = json.features[j].properties.name;
+							if (dataName == jsonName) {
+								//Copy the data value into the JSON
+								json.features[j].properties.totalGenerated = totalGenerated;
+                                json.features[j].properties.totalRenewableGenerated = totalRenewableGenerated;
+                                json.features[j].properties.percOfTotal = percOfTotal;
+                                json.features[j].properties.solarpower = solarpower;
+                                json.features[j].properties.biomassAndWaste = biomassAndWaste;
+                                json.features[j].properties.geothermal = geothermal;
+                                json.features[j].properties.hydropower = hydropower;
+                                json.features[j].properties.windpower = windpower;
+                                json.features[j].properties.selected = false;
+								
+								//Stop looking through the JSON
+								break;
+                            }
+                            if ((jsonName === 'Somaliland') || (jsonName === 'W. Sahara')) {
+                              	json.features[j].properties.totalGenerated = "";
+                                json.features[j].properties.totalRenewableGenerated = "";
+                                json.features[j].properties.percOfTotal = "";
+                                json.features[j].properties.solarpower = "";
+                                json.features[j].properties.biomassAndWaste = "";
+                                json.features[j].properties.geothermal = "";
+                                json.features[j].properties.hydropower = "";
+                                json.features[j].properties.windpower = "";
+                                json.features[j].properties.selected = false;
+
+                            }
+                        }
+                    }
+
+                var select_totals = {
+                    totalRenewableGenerated: 0,
+                    totalRenewableMeasured: 0,
+                    totalGenerated: 0,
+                    renewableTotal: 0,
+                    solarpower: 0,
+                    biomassAndWaste: 0,
+                    geothermal: 0,
+                    hydropower: 0,
+                    windpower: 0,
+                    selected: 0
+                }
+
+
+                var totals = d3.nest()
+                    .rollup(function(v) {return {
+                        generatedTotal: d3.sum(v, function(d) {
+                            return d.properties.totalGenerated}),
+                        renewableTotalMeasured: d3.sum(v, function(d) {
+                            if (d.properties.totalGenerated !== 0) {
+                                return d.properties.totalRenewableGenerated}}),
+                        renewableTotal: d3.sum(v, function(d) {
+                            return d.properties.totalRenewableGenerated}),
+                        solarPowerTotal: d3.sum(v, function(d) {
+                            return d.properties.solarpower}),
+                        biomassAndWasteTotal: d3.sum(v, function(d) {
+                            return d.properties.biomassAndWaste}),
+                        geothermalTotal: d3.sum(v, function(d) {
+                            return d.properties.geothermal}),
+                        hydropowerTotal: d3.sum(v, function(d) {
+                            return d.properties.hydropower}),
+                        windpowerTotal: d3.sum(v, function(d) {
+                            return d.properties.windpower})
+                    }})
+                    .entries(json.features)
+
+                var totalBar = svg.append("rect")
+                    .attr("width", function() {return barScale(totals.renewableTotalMeasured/totals.generatedTotal)})
+                    .attr("height", 25)
+                    .attr("y", 260)
+                    .attr("x", barX)
+                    .attr('class', 'bar')
+                    .style("fill", "#9EB25D")
+                    .attr("stroke", '#134611')
+				    .attr("stroke-width", 1.4)
+                    .on('click', function() {
+                        updateChoro('total')
+                    })
+
+                var totalBarPerc = svg.append("text")
+                    .attr("id", 'total-bar-perc')
+                    .attr('class', 'bar-label')
+                    .attr('x', function() {
+                        return barX + 5 + totalBar.node().getBoundingClientRect().width})
+                    .attr('y', function() {
+                        return totalBar.node().getBoundingClientRect().y + 9.5})
+                    .text(function() {return formatComma(totals.renewableTotalMeasured/totals.generatedTotal)})
+
+                var totalBarLabel = svg.append("text")
+                    .attr("class", "bar-label")
+                    .attr("x", barX-15)
+                    .attr('y', function() {
+                        return totalBar.node().getBoundingClientRect().y + 9.5})
+                    .html(function() {
+                        var x = d3.select(this).attr("x")
+                        var line1 = "<tspan x="+x+" dy='-0.7em' class='label'>Renewable as %</tspan>"
+                        var line2 = "<tspan x="+x+" dy='1.2em' class='label'>of Total Generated</tspan>"
+                        return line1 + line2
+                    })
+
+                var solarBar = svg.append("rect")
+                    .attr("width", function() {return barScale(totals.solarPowerTotal/totals.renewableTotal)})
+                    .attr("height", 25)
+                    .attr("y", 295)
+                    .attr("x", barX)
+                    .attr('class', 'bar')
+                    .style("fill", "#F1DB4B")
+                    .attr("stroke", '#134611')
+				    .attr("stroke-width", 1.4)
+                    .on('click', function() {
+                        updateChoro('solar')
+                    })
+
+                var solarBarPerc = svg.append("text")
+                    .attr("id", 'solar-bar-perc')
+                    .attr('class', 'bar-label')
+                    .attr('x', function() {
+                        return barX + 5 + solarBar.node().getBoundingClientRect().width})
+                    .attr('y', function() {
+                        return solarBar.node().getBoundingClientRect().y + 9.5})
+                    .text(function() {return formatComma(totals.solarPowerTotal/totals.renewableTotal)})
+
+                var solarBarLabel = svg.append("text")
+                    .attr("class", "bar-label")
+                    .attr("x", barX-15)
+                    .attr('y', function() {
+                        return solarBar.node().getBoundingClientRect().y + 9.5})
+                    .html(function() {
+                        var x = d3.select(this).attr("x")
+                        var line1 = "<tspan x="+x+" dy='-0.7em' class='label'>Solar as %</tspan>"
+                        var line2 = "<tspan x="+x+" dy='1.2em' class='label'>of Renewable</tspan>"
+                        return line1 + line2
+                    })
+                
+                 var biomassBar = svg.append("rect")
+                    .attr("width", function() {return barScale(totals.biomassAndWasteTotal/totals.renewableTotal)})
+                    .attr("height", 25)
+                    .attr("y", 330)
+                    .attr("x", barX)
+                    .attr('class', 'bar')
+                    .style("fill", "#678D58")
+                    .attr("stroke", '#134611')
+                    .attr("stroke-width", 1.4)
+                    .on('click', function() {
+                            updateChoro('biomass')
+                        })
+
+                var biomassBarPerc = svg.append("text")
+                    .attr("id", 'biomass-bar-perc')
+                    .attr('class', 'bar-label')
+                    .attr('x', function() {
+                        return barX + 5 + biomassBar.node().getBoundingClientRect().width})
+                    .attr('y', function() {
+                        return biomassBar.node().getBoundingClientRect().y + 9.5})
+                    .text(function() {return formatComma(totals.biomassAndWasteTotal/totals.renewableTotal)})
+
+                var biomassBarLabel = svg.append("text")
+                    .attr("class", "bar-label")
+                    .attr("x", barX-15)
+                    .attr('y', function() {
+                        return biomassBar.node().getBoundingClientRect().y + 9.5})
+                    .html(function() {
+                        var x = d3.select(this).attr("x")
+                        var line1 = "<tspan x="+x+" dy='-0.7em' class='label'>Biomass & Waste as %</tspan>"
+                        var line2 = "<tspan x="+x+" dy='1.2em' class='label'>of Renewable</tspan>"
+                        return line1 + line2
+                    })
+
+                 var geothermalBar = svg.append("rect")
+                    .attr("width", function() {return barScale(totals.geothermalTotal/totals.renewableTotal)})
+                    .attr("height", 25)
+                    .attr("y", 365)
+                    .attr("x", barX)
+                    .attr('class', 'bar')
+                    .style("fill", "#AD343E")
+                    .attr("stroke", '#134611')
+                    .attr("stroke-width", 1.4)
+                    .on('click', function() {
+                            updateChoro('geothermal')
+                        })
+
+                var geothermalBarPerc = svg.append("text")
+                    .attr("id", 'geothermal-bar-perc')
+                    .attr('class', 'bar-label')
+                    .attr('x', function() {
+                        return barX + 5 + geothermalBar.node().getBoundingClientRect().width})
+                    .attr('y', function() {
+                        return geothermalBar.node().getBoundingClientRect().y + 9.5})
+                    .text(function() {return formatComma(totals.geothermalTotal/totals.renewableTotal)})
+
+                var geothermalBarLabel = svg.append("text")
+                    .attr("class", "bar-label")
+                    .attr("x", barX-15)
+                    .attr('y', function() {
+                        return geothermalBar.node().getBoundingClientRect().y + 9.5})
+                    .html(function() {
+                        var x = d3.select(this).attr("x")
+                        var line1 = "<tspan x="+x+" dy='-0.7em' class='label'>Geothermal as %</tspan>"
+                        var line2 = "<tspan x="+x+" dy='1.2em' class='label'>of Renewable</tspan>"
+                        return line1 + line2
+                    })
+
+                 var hydroBar = svg.append("rect")
+                    .attr("width", function() {return barScale(totals.hydropowerTotal/totals.renewableTotal)})
+                    .attr("height", 25)
+                    .attr("y", 400)
+                    .attr("x", barX)
+                    .attr('class', 'bar')
+                    .style("fill", "#3A606E")
+                    .attr("stroke", '#134611')
+                    .attr("stroke-width", 1.4)
+                    .on('click', function() {
+                            updateChoro('hydro')
+                        })
+
+                var hydroBarPerc = svg.append("text")
+                    .attr("id", 'hydro-bar-perc')
+                    .attr('class', 'bar-label')
+                    .attr('x', function() {
+                        return barX + 5 + hydroBar.node().getBoundingClientRect().width})
+                    .attr('y', function() {
+                        return hydroBar.node().getBoundingClientRect().y + 9.5})
+                    .text(function() {return formatComma(totals.hydropowerTotal/totals.renewableTotal)})
+
+                var hydroBarLabel = svg.append("text")
+                    .attr("class", "bar-label")
+                    .attr("x", barX-15)
+                    .attr('y', function() {
+                        return hydroBar.node().getBoundingClientRect().y + 9.5})
+                    .html(function() {
+                        var x = d3.select(this).attr("x")
+                        var line1 = "<tspan x="+x+" dy='-0.7em' class='label'>Hydro as %</tspan>"
+                        var line2 = "<tspan x="+x+" dy='1.2em' class='label'>of Renewable</tspan>"
+                        return line1 + line2
+                    })
+
+                 var windBar = svg.append("rect")
+                    .attr("width", function() {return barScale(totals.windpowerTotal/totals.renewableTotal)})
+                    .attr("height", 25)
+                    .attr("y", 435)
+                    .attr("x", barX)
+                    .attr('class', 'bar')
+                    .style("fill", "#A7C6DA")
+                    .attr("stroke", '#134611')
+                    .attr("stroke-width", 1.4)
+                    .on('click', function() {
+                            updateChoro('wind')
+                        })  
+
+                var windBarPerc = svg.append("text")
+                    .attr("id", 'hydro-bar-perc')
+                    .attr('class', 'bar-label')
+                    .attr('x', function() {
+                        return barX + 5 + windBar.node().getBoundingClientRect().width})
+                    .attr('y', function() {
+                        return windBar.node().getBoundingClientRect().y + 9.5})
+                    .text(function() {return formatComma(totals.windpowerTotal/totals.renewableTotal)})
+
+                var windBarLabel = svg.append("text")
+                    .attr("class", "bar-label")
+                    .attr("x", barX-15)
+                    .attr('y', function() {
+                        return windBar.node().getBoundingClientRect().y + 9.5})
+                    .html(function() {
+                        var x = d3.select(this).attr("x")
+                        var line1 = "<tspan x="+x+" dy='-0.7em' class='label'>Wind as %</tspan>"
+                        var line2 = "<tspan x="+x+" dy='1.2em' class='label'>of Renewable</tspan>"
+                        return line1 + line2
+                    })
+                
+
+                //Bind data and create one path per GeoJSON feature
+				var countries = svg.selectAll("countries")
+                    .data(json.features)
+                    .enter()
+                    .append("path")
+                    .attr("d", path)
+                    .attr("id", function(d, i) {return ('country_' + i)})
+                    .attr("class", "country")
+                    .style("fill", function(d) {
+                        if (d.properties.percOfTotal === undefined) {
+                            return '#DEDFDB'
+                        }
+                        return colorPerc(d.properties.percOfTotal)})
+                    .attr("stroke", '#134611')
+                    .attr("stroke-width", 1.2)
+                    .on("mouseover", countryMouseOver)
+                    .on("mouseout", countryMouseOut)
+                    .on("click", function(d) {
+                        var selected = d3.select(this);
+                        if (d.properties.selected === false) {
+                            if (select_totals.selected === 0) {
+                                d3.selectAll(".country")
+                                    .attr("opacity", 0.55)
+                            }
+                            selected
+                                .attr("opacity", 1)
+                                .attr("stroke-width", 2)
+                            d.properties.selected = true
+                            select_totals.totalRenewableGenerated += d.properties.totalRenewableGenerated
+                            select_totals.totalGenerated += d.properties.totalGenerated
+                            select_totals.solarpower += d.properties.solarpower
+                            select_totals.biomassAndWaste += d.properties.biomassAndWaste
+                            select_totals.geothermal += d.properties.geothermal
+                            select_totals.hydropower += d.properties.hydropower
+                            select_totals.windpower += d.properties.windpower
+                            select_totals.selected += 1
+                            if (d.properties.totalGenerated !== 0) {
+                                select_totals.totalRenewableMeasured += d.properties.totalRenewableGenerated
+                            }
+                            updateBars((select_totals.totalRenewableMeasured/select_totals.totalGenerated)*100, select_totals.totalRenewableGenerated, select_totals.solarpower,
+                                        select_totals.biomassAndWaste, select_totals.geothermal, select_totals.hydropower, select_totals.windpower)
+                            
+                        } else {
+                            selected
+                                .attr("opacity", 0.4)
+                                .attr("stroke-width", 1.2)
+                            d.properties.selected = false
+                            select_totals.totalRenewableGenerated -= d.properties.totalRenewableGenerated
+                            select_totals.totalGenerated -= d.properties.totalGenerated
+                            select_totals.solarpower -= d.properties.solarpower
+                            select_totals.biomassAndWaste -= d.properties.biomassAndWaste
+                            select_totals.geothermal -= d.properties.geothermal
+                            select_totals.hydropower -= d.properties.hydropower
+                            select_totals.windpower -= d.properties.windpower
+                            select_totals.selected -= 1
+                            if (d.properties.totalGenerated !== 0) {
+                                select_totals.totalRenewableMeasured -= d.properties.totalRenewableGenerated
+                            }
+                            if (select_totals.selected > 0) {
+                                updateBars((select_totals.totalRenewableMeasured/select_totals.totalGenerated)*100, select_totals.totalRenewableGenerated, select_totals.solarpower,
+                                        select_totals.biomassAndWaste, select_totals.geothermal, select_totals.hydropower, select_totals.windpower)
+                            } else {
+                                updateBars((totals.renewableTotalMeasured/totals.generatedTotal)*100, totals.renewableTotal, totals.solarPowerTotal,
+                                    totals.biomassAndWasteTotal, totals.geothermalTotal, totals.hydropowerTotal, totals.windpowerTotal)
+                            }
+                            if (select_totals.selected === 0) {
+                                d3.selectAll(".country")
+                                    .attr("opacity", 1)
+                            }
+
+                        }
+                    })
+
+
+                function countryMouseOver(d, i) {
+                    
+                    //d3.select(this)
+                        //.style('stroke', '#134611')
+                        //.style("stroke-width", 2)
+
+                var dummyToolText = svg.append("text")
+                    .attr("id", 'country-mouse-over-dummy-text')
+                    .attr('class', 'country-mouse-over-text')
+                    .attr('x', function() {
+                        return d3.select('#country_' + i).node().getBBox().x + d3.select('#country_' + i).node().getBBox().width/2})
+                    .attr('y', function() {
+                        return d3.select('#country_' + i).node().getBBox().y + d3.select('#country_' + i).node().getBBox().height/2})
+                    .attr("text-anchor", "middle")
+                    .text(function() {return d.properties.name})
+
+                var toolBox = svg.append('rect')
+                    .attr("id", 'country-mouse-over-box')
+                    .attr('x', function() {
+                        return dummyToolText.node().getBBox().x - 5
+                    })
+                    .attr('y', function() {
+                        return dummyToolText.node().getBoundingClientRect().y -9
+                    })
+                    .attr('width', function() {
+                        return dummyToolText.node().getBoundingClientRect().width + 10
+                    })
+                    .attr('height', function() {
+                        return dummyToolText.node().getBoundingClientRect().height + 5
+                    })
+                    .style("fill", "#F3F4EF")
+                    .style("opacity", 0.8)
+                    
+
+                var toolText = svg.append("text")
+                    .attr("id", 'country-mouse-over-text')
+                    .attr('class', 'country-mouse-over-text')
+                    .attr('x', function() {
+                        return d3.select('#country_' + i).node().getBBox().x + d3.select('#country_' + i).node().getBBox().width/2})
+                    .attr('y', function() {
+                        return d3.select('#country_' + i).node().getBBox().y + d3.select('#country_' + i).node().getBBox().height/2})
+                    .attr("text-anchor", "middle")
+                    .text(function() {return d.properties.name})
+
+                if (select_totals.selected === 0) {
+                    updateBars(d.properties.percOfTotal, d.properties.totalRenewableGenerated, d.properties.solarpower,
+                                d.properties.biomassAndWaste, d.properties.geothermal, d.properties.hydropower, d.properties.windpower)
+                    }
+                }
+
+                function countryMouseOut() {
+                    d3.select('#country-mouse-over-text').remove()
+                    d3.select('#country-mouse-over-box').remove()
+                    d3.select('#country-mouse-over-dummy-text').remove()
+
+                    if (select_totals.selected === 0) {
+                        updateBars((totals.renewableTotalMeasured/totals.generatedTotal)*100, totals.renewableTotal, totals.solarPowerTotal,
+                                totals.biomassAndWasteTotal, totals.geothermalTotal, totals.hydropowerTotal, totals.windpowerTotal)
+                    }
+
+                }
+
+                function updateBars(percOfTotal, totalRenewableGenerated, solarpower,
+                            biomassAndWaste, geothermal, hydropower, windpower) {
+
+                    totalBar.attr("width", function() {return barScale(percOfTotal/100)})
+
+                    totalBarPerc.attr('x', function() {return barX + 5 + totalBar.node().getBoundingClientRect().width})
+                        .text(function() {return formatComma(percOfTotal/100)})
+
+                    solarBar.attr("width", function() {return barScale(solarpower/totalRenewableGenerated)})
+
+                    solarBarPerc.attr('x', function() {return barX + 5 + solarBar.node().getBoundingClientRect().width})
+                        .text(function() {return formatComma(solarpower/totalRenewableGenerated)})
+
+                    biomassBar.attr("width", function() {return barScale(biomassAndWaste/totalRenewableGenerated)})
+
+                    biomassBarPerc.attr('x', function() {return barX + 5 + biomassBar.node().getBoundingClientRect().width})
+                        .text(function() {return formatComma(biomassAndWaste/totalRenewableGenerated)})
+
+                    geothermalBar.attr("width", function() {return barScale(geothermal/totalRenewableGenerated)})
+
+                    geothermalBarPerc.attr('x', function() {return barX + 5 + geothermalBar.node().getBoundingClientRect().width})
+                        .text(function() {return formatComma(geothermal/totalRenewableGenerated)})
+
+                    hydroBar.attr("width", function() {return barScale(hydropower/totalRenewableGenerated)})
+
+                    hydroBarPerc.attr('x', function() {return barX + 5 + hydroBar.node().getBoundingClientRect().width})
+                        .text(function() {return formatComma(hydropower/totalRenewableGenerated)})
+
+                    windBar.attr("width", function() {return barScale(windpower/totalRenewableGenerated)})
+
+                    windBarPerc.attr('x', function() {return barX + 5 + windBar.node().getBoundingClientRect().width})
+                        .text(function() {return formatComma(windpower/totalRenewableGenerated)})
+                }
+
+
+                function updateChoro(mode) {
+                    countries
+                    .style("fill", function(d) {
+                        if (mode === 'total') {
+                            if (isNaN(d.properties.percOfTotal) === true) {
+                            return '#DEDFDB'
+                        } else {
+                            return colorPerc(d.properties.percOfTotal)
+                        }}
+                        if (mode === 'solar') {
+                            if (isNaN(d.properties.solarpower/d.properties.totalRenewableGenerated) === true) {
+                            return '#DEDFDB'
+                        } else {
+                            return colorSolar(d.properties.solarpower/d.properties.totalRenewableGenerated)
+                        }}
+                        if (mode === 'biomass') {
+                            if (isNaN(d.properties.biomassAndWaste/d.properties.totalRenewableGenerated) === true) {
+                            return '#DEDFDB'
+                        } else {
+                            return colorBio(d.properties.biomassAndWaste/d.properties.totalRenewableGenerated)
+                        }}
+                        if (mode === 'geothermal') {
+                            if (isNaN(d.properties.geothermal/d.properties.totalRenewableGenerated) === true) {
+                            return '#DEDFDB'
+                        } else {
+                            return colorThermal(d.properties.geothermal/d.properties.totalRenewableGenerated)
+                        }}
+                        if (mode === 'hydro') {
+                            if (isNaN(d.properties.hydropower/d.properties.totalRenewableGenerated) === true) {
+                            return '#DEDFDB'
+                        } else {
+                            return colorHydro(d.properties.hydropower/d.properties.totalRenewableGenerated)
+                        }}
+                        if (mode === 'wind') {
+                            if (isNaN(d.properties.windpower/d.properties.totalRenewableGenerated) === true) {
+                            return '#DEDFDB'
+                        } else {
+                            return colorWind(d.properties.windpower/d.properties.totalRenewableGenerated)
+                        }}
+                    })
+
+
+
+                        
+
+                }
+
+
+
+
+
+
+                })
+
+				
+
+
+
+
+		
+			});
+			
+		</script>
+	</body>
+</html>
